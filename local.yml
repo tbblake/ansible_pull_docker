@@ -1,7 +1,5 @@
 ---
 - name: download & install docker
-  hosts: 192.168.2.171,192.168.2.172,192.168.2.173
-  remote_user: tblake
-  become: true
+  hosts: localhost
   roles:
     - docker
