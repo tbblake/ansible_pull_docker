@@ -1,0 +1,88 @@
+- name: End if we're not running debian bookworm on armv6l/aarch64/x86_64
+  meta: end_play
+  when: ansible_architecture not in ['armv6l','aarch64','x86_64'] or ansible_distribution != "Debian" or ansible_distribution_release != "bookworm"
+
+- name: get docker keyring
+  get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+  register: keyring_installed
+
+- name: remove packages
+  package:
+    update_cache: yes
+    state: absent
+    autoremove: yes
+    purge: yes
+    name:
+      - docker.io
+      - python3-docker
+      - python3-dockerpty
+      - wmdocker
+      - docker-doc
+      - docker-compose
+      - podman-docker
+      - containerd
+      - runc
+  when: keyring_installed.changed == 1 # only remove stuff if we installed a keyring for the new ones
+
+- name: remove /var/lib/docker
+  file:
+    path: /var/lib/docker
+    state: absent
+  when: keyring_installed.changed == 1 # only remove stuff if we installed a keyring for the new ones
+
+- name: remove /var/lib/containerd
+  file:
+    path: /var/lib/containerd
+    state: absent
+  when: keyring_installed.changed == 1 # only remove stuff if we installed a keyring for the new ones
+
+- name: Gather dpkg architecture
+  command: dpkg --print-architecture
+  register: dpkg_arch
+
+- name: create docker repo file
+  copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    owner: root
+    group: root
+    mode: 0644
+    content: |
+      deb [arch={{ dpkg_arch.stdout }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian {{ansible_distribution_release}} stable
+
+- name: install all packages
+  package:
+    update_cache: yes
+    state: present
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+      - python3-docker
+
+- name: systemd startup docker
+  systemd_service:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Run the hello-world container
+  docker_container:
+    name: hello-world
+    image: library/hello-world
+    auto_remove: true
+
+- name: Remove the hello-world image
+  docker_image:
+    name: hello-world
+    state: absent
+
+- name: add tblake to the docker group
+  user:
+    user: tblake
+    groups: docker
+    append: true
