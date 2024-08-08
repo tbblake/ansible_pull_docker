@@ -11,3 +11,9 @@ And then test out your docker install:
 ```
 sudo docker run hello-world
 ```
+
+or all in one:
+
+```
+curl -fsSL https://raw.githubusercontent.com/tbblake/ansible_pull_docker/master/run.sh | sudo bash
+```
